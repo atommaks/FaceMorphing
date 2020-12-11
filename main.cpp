@@ -1,6 +1,5 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
-#include <chrono>
 
 #include "tools/geometry_tools.cpp"
 #include "tools/image_tools.cpp"
@@ -13,7 +12,6 @@ const int fps = 24;
 
 int main(int argc, const char * argv[])
 {
-    auto start_time = std::chrono::high_resolution_clock::now();
     if (argc != 4)
     {
         std::cout << usage_msg << std::endl;
@@ -70,10 +68,6 @@ int main(int argc, const char * argv[])
             }
             frames.push_back(morphed_img / 255.f);
         }
-
-        auto end_time = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<float> search_time = end_time - start_time;
-        std::cout << search_time.count() << std::endl;
 
         cv::namedWindow(window_name, cv::WINDOW_AUTOSIZE);
         cv::imshow(window_name, img1 / 255.f);
