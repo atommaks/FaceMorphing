@@ -1,6 +1,18 @@
 #include "image_tools.h"
 
-std::vector<std::vector<int>> get_tri_list_indices(cv::Mat& img, std::vector<cv::Point2f>& landmarks)
+struct less_point: std::binary_function<const cv::Point2f*, const cv::Point2f*, bool>
+{
+    bool operator() (const cv::Point2f *a, const cv::Point2f *b) const
+    {
+        //int x1 = cvRound(a->x), y1 = cvRound(a->y);
+        //int x2 = cvRound(b->x), y2 = cvRound(b->y);
+        int x1 = a->x, y1 = a->y;
+        int x2 = b->x, y2 = b->y;
+        return (x1 < x2) || (x1 == x2 && y1 < y2);
+    }
+};
+
+std::vector<std::vector<int>> get_tri_list_indices(cv::Mat &img, std::vector<cv::Point2f> &landmarks)
 {
     cv::Rect rect = cv::Rect(0, 0, img.size().width, img.size().height);
     cv::Subdiv2D subdiv = cv::Subdiv2D(rect);
@@ -8,35 +20,37 @@ std::vector<std::vector<int>> get_tri_list_indices(cv::Mat& img, std::vector<cv:
     subdiv.insert(landmarks);
     subdiv.getTriangleList(tri_list);
 
+    std::map<cv::Point2f*, int, less_point> map;
+    for (int i = 0; i < landmarks.size(); i++)
+        map[&landmarks[i]] = i;
+
     std::vector<std::vector<int>> indeces;
-    std::vector<cv::Point> pt(3);
     for (int i = 0; i < tri_list.size(); i++)
     {
-        cv::Vec6f t = tri_list[i];
-        pt[0] = cv::Point(cvRound(t[0]), cvRound(t[1]));
-        pt[1] = cv::Point(cvRound(t[2]), cvRound(t[3]));
-        pt[2] = cv::Point(cvRound(t[4]), cvRound(t[5]));
         std::vector<int> tri;
         for (int j = 0; j < 3; j++)
         {
-            int index = find_point_index(pt[j], landmarks);
-            if (index != -1)
-                tri.push_back(index);
+            cv::Point2f p = cv::Point2f(cvRound(tri_list[i][j * 2]), cvRound(tri_list[i][j * 2 + 1]));
+            tri.push_back(map[&p]);
         }
-        if (tri.size() == 3)
-            indeces.push_back(tri);
+        indeces.push_back(tri);
     }
 
     return indeces;
 }
 
-int find_point_index(cv::Point point, std::vector<cv::Point2f>& points)
+void check_image_size(cv::Mat &img)
 {
-    for (int i = 0; i < points.size(); i++)
-        if (abs(cvRound(points[i].x) - point.x) < 1.0 && abs(cvRound(points[i].y) - point.y) < 1.0)
-            return i;
-
-    return -1;
+    const unsigned int MAX_WIDTH = 1920, MAX_HEIGHT = 1080;
+    const float divder = 2.f;
+    float width = (float)img.cols, height = (float)img.rows;
+    while (width > MAX_WIDTH && height > MAX_HEIGHT)
+    {
+        width /= divder;
+        height /= divder;
+    }
+    if ((int)width != img.cols || (int)height != img.rows)
+        cv::resize(img, img, cv::Size((int)width, (int)height));
 }
 
 void make_equal_size(cv::Mat &img1, cv::Mat &img2, dlib::shape_predictor &predictor)
@@ -113,7 +127,7 @@ void crop_image(cv::Mat &img, dlib::shape_predictor &predictor)
     }
 }
 
-dlib::rectangle get_face_rectangle(cv::Mat& img, dlib::shape_predictor& predictor)
+dlib::rectangle get_face_rectangle(cv::Mat &img, dlib::shape_predictor &predictor)
 {
     dlib::frontal_face_detector detector = dlib::get_frontal_face_detector();
     dlib::array2d<dlib::rgb_pixel> dlib_img;
